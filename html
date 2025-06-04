@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Выживание вампира</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #111827; /* bg-gray-900 */
+            color: #f3f4f6; /* text-gray-100 */
+            margin: 0;
+            overflow: hidden; 
+            touch-action: none; 
+        }
+        #gameCanvas {
+            border: 2px solid #374151; /* border-gray-700 */
+            background-color: #1f2937; /* bg-gray-800 */
+            border-radius: 0.5rem; /* rounded-lg */
+            display: block;
+        }
+        .ui-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-wrap: wrap; 
+            gap: 15px;
+            background-color: rgba(31, 41, 55, 0.8);
+            padding: 8px 15px;
+            border-radius: 0.5rem;
+            z-index: 10;
+            align-items: center;
+        }
+        .ui-text {
+            font-size: 1rem; 
+            font-weight: 500;
+        }
+        #xpBarContainer {
+            position: absolute;
+            bottom: 10px;
+            left: 10%;
+            width: 80%;
+            height: 20px;
+            background-color: #4b5563; 
+            border-radius: 0.375rem; 
+            z-index: 10;
+            border: 1px solid #6b7280; 
+        }
+        #xpBar {
+            width: 0%;
+            height: 100%;
+            background-color: #8b5cf6; 
+            border-radius: 0.375rem; 
+            transition: width 0.3s ease-in-out;
+        }
+        .overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .overlay-title {
+            font-size: 2.5rem; 
+            font-weight: bold;
+            margin-bottom: 1rem; 
+            text-align: center;
+        }
+        .overlay-text {
+            font-size: 1.25rem; 
+            margin-bottom: 1rem; 
+            text-align: center;
+        }
+        #gameOverImage {
+            max-width: 80%;
+            max-height: 40vh; 
+            border-radius: 0.5rem; 
+            margin-bottom: 1rem; 
+            object-fit: contain; 
+        }
+        .overlay-button, .class-choice-button { /* Combined common styles */
+            background-color: #3b82f6; 
+            color: white;
+            font-weight: 500;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            border: none;
+            margin-top: 1rem;
+            width: 100%; /* Make buttons full width of their container */
+        }
+        .overlay-button:hover, .class-choice-button:hover {
+            background-color: #2563eb; 
+        }
+        .class-choice-button { /* Specific styles for class choice */
+             background-color: #4f46e5; /* indigo-600 */
+             border: 1px solid #6366f1; /* indigo-500 */
+             text-align: left; 
+             padding: 1rem; /* Larger padding for class buttons */
+        }
+        .class-choice-button:hover {
+             background-color: #4338ca; /* indigo-700 */
+        }
+
+        .choice-container { /* Renamed from weapon-choice-container for generality */
+            display: flex;
+            flex-direction: column; 
+            gap: 1rem;
+            width: 100%;
+            max-width: 450px; 
+        }
+        .choice-title { /* Renamed for generality */
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .choice-desc { /* Renamed for generality */
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="uiContainer" class="ui-container" style="display: none;"> <!-- Initially hidden -->
+        <div id="healthDisplay" class="ui-text">Здоровье: 100</div>
+        <div id="levelDisplay" class="ui-text">Уровень: 1</div>
+        <div id="timeDisplay" class="ui-text">Время: 0с</div>
+        <div id="scoreDisplay" class="ui-text">Очки: 0</div>
+    </div>
+
+    <div id="xpBarContainer" style="display: none;"> <!-- Initially hidden -->
+        <div id="xpBar"></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="classSelectionScreen" class="overlay-screen" style="display: none;">
+        <div class="overlay-title">Выберите свой путь</div>
+        <div id="classChoiceContainer" class="choice-container">
+            <!-- Кнопки выбора класса будут добавлены сюда -->
+        </div>
+    </div>
+
+    <div id="gameOverScreen" class="overlay-screen" style="display: none;">
+        <div id="gameOverTitle" class="overlay-title">Игра окончена!</div> 
+        <img id="gameOverImage" src="https://placehold.co/400x300/1f2937/f3f4f6?text=Загрузка..." alt="Изображение конца игры" style="display: none;"/>
+        <div id="finalTimeText" class="overlay-text">Вы продержались: 0с</div>
+        <div id="finalScoreText" class="overlay-text">Финальный счет: 0</div>
+        <button id="restartButton" class="overlay-button">Начать заново</button>
+    </div>
+
+    <div id="levelUpScreen" class="overlay-screen" style="display: none;">
+        <div class="overlay-title">Уровень повышен!</div>
+        <div class="overlay-text">Выберите улучшение:</div>
+        <div id="weaponChoiceContainer" class="choice-container">
+            <!-- Варианты оружия будут добавлены сюда -->
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const uiContainer = document.getElementById('uiContainer'); // Get UI container
+        const xpBarContainer = document.getElementById('xpBarContainer'); // Get XP bar container
+
+        const healthDisplay = document.getElementById('healthDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const levelDisplay = document.getElementById('levelDisplay');
+        const xpBar = document.getElementById('xpBar');
+
+        const classSelectionScreen = document.getElementById('classSelectionScreen');
+        const classChoiceContainer = document.getElementById('classChoiceContainer');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const gameOverTitleElement = document.getElementById('gameOverTitle'); 
+        const gameOverImageElement = document.getElementById('gameOverImage'); 
+        const finalTimeText = document.getElementById('finalTimeText');
+        const finalScoreText = document.getElementById('finalScoreText');
+        const restartButton = document.getElementById('restartButton');
+
+        const levelUpScreen = document.getElementById('levelUpScreen');
+        const weaponChoiceContainer = document.getElementById('weaponChoiceContainer');
+
+        let player, enemies, xpOrbs, gameInterval, spawnInterval, timerInterval;
+        let keys = {};
+        let score = 0;
+        let elapsedTime = 0; 
+        let animationFrameCounter = 0; 
+        let gameActive = false; // Game is not active until class is selected
+        let gamePaused = true;  // Game is paused until class is selected
+
+        // Joystick control variables
+        let joystickActive = false;
+        let joystickCenterX = 0;
+        let joystickCenterY = 0;
+        let joystickKnobX = 0;
+        let joystickKnobY = 0;
+        const JOYSTICK_BASE_RADIUS = 60; 
+        const JOYSTICK_KNOB_RADIUS = 25; 
+        const JOYSTICK_DEAD_ZONE = 10; 
+        let playerMoveDx = 0; 
+        let playerMoveDy = 0; 
+
+
+        const PLAYER_SIZE = 20;
+        const PLAYER_SPEED = 3.5; 
+        const PLAYER_MAX_HEALTH = 100;
+
+        // Enemy constants
+        const ENEMY_REGULAR_SIZE = 10; 
+        const ENEMY_ARMORED_SIZE_MULTIPLIER = 1.6;
+        const ENEMY_SPEED_MIN = 0.4;
+        const ENEMY_SPEED_MAX = 1.2;
+        const ENEMY_SPAWN_INTERVAL_INITIAL = 2000; 
+        let currentEnemySpawnInterval = ENEMY_SPAWN_INTERVAL_INITIAL;
+        const ENEMY_HEALTH_INITIAL = 20;
+        let currentEnemyHealth = ENEMY_HEALTH_INITIAL; 
+        const ARMORED_ENEMY_HEALTH_MULTIPLIER = 2.5;
+        const ARMORED_ENEMY_SPEED_MULTIPLIER = 0.75;
+        const ARMORED_ENEMY_XP_MULTIPLIER = 2;
+        const ARMORED_ENEMY_SPAWN_TIME_THRESHOLD = 45; 
+        const ARMORED_ENEMY_SPAWN_CHANCE = 0.20; 
+
+        const ENEMY_XP_DROP = 15; 
+
+        const XP_ORB_SIZE = 8;
+        const XP_ORB_MAGNET_RADIUS = 70; 
+
+        const WEAPONS = {
+            AURA: 'AURA',
+            SCYTHE: 'SCYTHE',
+            STAFF: 'STAFF',
+            FIRERAIN: 'FIRERAIN' 
+        };
+
+        const PLAYER_CLASSES = [
+            { name: "Рыцарь Ауры", weapon: WEAPONS.AURA, description: "Начинает с защитной аурой, наносящей урон врагам вокруг." },
+            { name: "Жнец Душ", weapon: WEAPONS.SCYTHE, description: "Начинает с вращающимися косами, прорубающими ряды врагов." },
+            { name: "Чародей Посоха", weapon: WEAPONS.STAFF, description: "Начинает с магическим посохом, стреляющим в ближайших врагов." },
+            { name: "Пиромант", weapon: WEAPONS.FIRERAIN, description: "Начинает со способностью вызывать огненный дождь по области." }
+        ];
+
+        const USER_GAME_OVER_IMAGE_URL = "https://gemotest.ru/upload/medialibrary/27522/%D0%AD%D0%BC%D0%B1%D1%80%D0%B8%D0%BE%D0%BD.jpg";
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth; 
+            canvas.height = window.innerHeight; 
+        }
+
+        class XPOrb {
+            constructor(x, y, value) {
+                this.x = x;
+                this.y = y;
+                this.size = XP_ORB_SIZE;
+                this.value = value;
+                this.magnetSpeed = 3.5; 
+            }
+
+            draw() {
+                ctx.fillStyle = '#facc15'; 
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            update() {
+                if (!player) return;
+                const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
+                if (distToPlayer < XP_ORB_MAGNET_RADIUS + player.size / 2) { 
+                    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                    this.x += Math.cos(angle) * this.magnetSpeed;
+                    this.y += Math.sin(angle) * this.magnetSpeed;
+                }
+            }
+        }
+        
+        class Projectile {
+            constructor(startX, startY, targetEnemy, speed, damage, size, color) {
+                this.x = startX;
+                this.y = startY;
+                this.target = targetEnemy; 
+                this.speed = speed;
+                this.damage = damage;
+                this.size = size;
+                this.color = color;
+                this.active = true; 
+            }
+
+            update() {
+                if (!this.active || !this.target || this.target.health <= 0) { 
+                    this.active = false;
+                    return;
+                }
+
+                const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+                this.x += Math.cos(angle) * this.speed;
+                this.y += Math.sin(angle) * this.speed;
+
+                const distToTarget = Math.hypot(this.x - this.target.x, this.y - this.target.y);
+                if (distToTarget < this.size / 2 + this.target.size / 2) { 
+                    if (this.target.takeDamage(this.damage)) { 
+                        const enemyIndex = enemies.indexOf(this.target);
+                        if (enemyIndex > -1) {
+                            enemies.splice(enemyIndex, 1);
+                            score += 10; 
+                        }
+                    }
+                    this.active = false; 
+                    updateUI();
+                }
+
+                if (this.x < -this.size || this.x > canvas.width + this.size ||
+                    this.y < -this.size || this.y > canvas.height + this.size) {
+                    this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                if (!this.active) return;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+
+        class Player {
+            constructor(x, y, size, speed, health, startingWeaponType) { // Added startingWeaponType
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.speed = speed;
+                this.health = health;
+                this.maxHealth = health;
+                
+                this.level = 1;
+                this.currentXP = 0;
+                this.xpToNextLevel = 100;
+
+                this.activeWeapons = [];
+                this.startingWeaponType = startingWeaponType; // Store starting weapon
+                this.initializeWeapons();
+            }
+
+            initializeWeapons() {
+                if (this.startingWeaponType) {
+                    this.addWeapon(this.startingWeaponType);
+                } else {
+                    // Fallback, though this shouldn't be reached with the new flow
+                    this.addWeapon(WEAPONS.AURA); 
+                    console.warn("Player initialized without a starting weapon type, defaulting to Aura.");
+                }
+            }
+
+            addWeapon(weaponType, upgrade = false) {
+                const existingWeapon = this.activeWeapons.find(w => w.type === weaponType);
+                if (existingWeapon && upgrade) {
+                    existingWeapon.upgrade();
+                } else if (!existingWeapon) {
+                    switch (weaponType) {
+                        case WEAPONS.AURA:
+                            this.activeWeapons.push(new AuraWeapon(this));
+                            break;
+                        case WEAPONS.SCYTHE:
+                            this.activeWeapons.push(new ScytheWeapon(this));
+                            break;
+                        case WEAPONS.STAFF:
+                            this.activeWeapons.push(new StaffWeapon(this));
+                            break;
+                        case WEAPONS.FIRERAIN:
+                            this.activeWeapons.push(new FireRainWeapon(this));
+                            break;
+                    }
+                }
+            }
+
+            draw() {
+                const healthRatio = this.health / this.maxHealth;
+                const r = Math.floor(220 + (255 - 220) * (1 - healthRatio));
+                const g = Math.floor(38 + (255 - 38) * (1 - healthRatio));
+                const b = Math.floor(38 + (255 - 38) * (1 - healthRatio));
+                ctx.fillStyle = `rgb(${r},${g},${b})`; 
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                const healthBarWidth = this.size * 1.5;
+                const healthBarHeight = 5;
+                const healthBarX = this.x - healthBarWidth / 2;
+                const healthBarY = this.y - this.size / 2 - healthBarHeight - 5; 
+                
+                ctx.fillStyle = '#4b5563'; 
+                ctx.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+                
+                const currentHealthWidth = (this.health / this.maxHealth) * healthBarWidth;
+                if (healthRatio > 0.6) {
+                    ctx.fillStyle = '#10b981'; 
+                } else if (healthRatio > 0.3) {
+                    ctx.fillStyle = '#f59e0b'; 
+                } else {
+                    ctx.fillStyle = '#ef4444'; 
+                }
+                ctx.fillRect(healthBarX, healthBarY, currentHealthWidth > 0 ? currentHealthWidth : 0, healthBarHeight);
+
+
+                this.activeWeapons.forEach(weapon => weapon.draw(ctx));
+            }
+
+            update() {
+                let currentMoveDx = 0;
+                let currentMoveDy = 0;
+
+                if (joystickActive) {
+                    currentMoveDx = playerMoveDx;
+                    currentMoveDy = playerMoveDy;
+                } else {
+                    // Keyboard movement
+                    if (keys['ArrowUp'] || keys['w'] || keys['W'] || keys['ц'] || keys['Ц']) currentMoveDy = -1;
+                    if (keys['ArrowDown'] || keys['s'] || keys['S'] || keys['ы'] || keys['Ы']) currentMoveDy = 1;
+                    if (keys['ArrowLeft'] || keys['a'] || keys['A'] || keys['ф'] || keys['Ф']) currentMoveDx = -1;
+                    if (keys['ArrowRight'] || keys['d'] || keys['D'] || keys['в'] || keys['В']) currentMoveDx = 1;
+
+                    // Normalize keyboard diagonal movement
+                    if (currentMoveDx !== 0 && currentMoveDy !== 0) {
+                        const magnitude = Math.sqrt(currentMoveDx * currentMoveDx + currentMoveDy * currentMoveDy);
+                        currentMoveDx /= magnitude;
+                        currentMoveDy /= magnitude;
+                    }
+                }
+
+                if (currentMoveDx !== 0 || currentMoveDy !== 0) {
+                    this.x += currentMoveDx * this.speed;
+                    this.y += currentMoveDy * this.speed;
+                }
+
+                this.x = Math.max(this.size / 2, Math.min(canvas.width - this.size / 2, this.x));
+                this.y = Math.max(this.size / 2, Math.min(canvas.height - this.size / 2, this.y));
+
+                this.activeWeapons.forEach(weapon => weapon.update());
+            }
+
+            takeDamage(amount) {
+                this.health -= amount;
+                if (this.health <= 0) {
+                    this.health = 0;
+                    gameOver();
+                }
+                updateUI();
+            }
+
+            addXP(amount) {
+                if (!gameActive) return;
+                this.currentXP += amount;
+                if (this.currentXP >= this.xpToNextLevel) {
+                    this.levelUp();
+                }
+                updateUI();
+            }
+
+            levelUp() {
+                this.level++;
+                this.currentXP = this.currentXP - this.xpToNextLevel; 
+                this.xpToNextLevel = Math.floor(100 * Math.pow(1.3, this.level - 1)); 
+                this.health = Math.min(this.maxHealth, this.health + Math.floor(this.maxHealth * 0.20)); 
+                
+                pauseGameAndShowLevelUpChoices();
+                updateUI();
+            }
+        }
+
+        class AuraWeapon {
+            constructor(player) {
+                this.player = player;
+                this.type = WEAPONS.AURA;
+                this.level = 1;
+                this.radius = 40;
+                this.damagePerSecond = 12; 
+                this.color = 'rgba(139, 0, 0, 0.3)';
+            }
+            update() {}
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.player.x, this.player.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            getDamagePerFrame() { return this.damagePerSecond / 60; }
+            upgrade() {
+                this.level++;
+                this.radius += 6; 
+                this.damagePerSecond += 6; 
+            }
+            getUpgradeDescription() {
+                return `Увеличить радиус (+6) и урон ауры (+6/сек). Текущий: ${this.radius} радиус, ${this.damagePerSecond.toFixed(1)} урон/сек.`;
+            }
+        }
+
+        class ScytheWeapon {
+            constructor(player) {
+                this.player = player;
+                this.type = WEAPONS.SCYTHE;
+                this.level = 1;
+                this.numScythes = 1;
+                this.scythes = [];
+                this.orbitRadius = 65; 
+                this.rotationSpeed = 0.035; 
+                this.scytheSize = 28; 
+                this.damage = 30; 
+                this.createScythes();
+            }
+            createScythes() {
+                this.scythes = [];
+                for (let i = 0; i < this.numScythes; i++) {
+                    this.scythes.push({ angle: (Math.PI * 2 / this.numScythes) * i, x: 0, y: 0 });
+                }
+            }
+            update() {
+                this.scythes.forEach(scythe => {
+                    scythe.angle += this.rotationSpeed;
+                    scythe.x = this.player.x + Math.cos(scythe.angle) * this.orbitRadius;
+                    scythe.y = this.player.y + Math.sin(scythe.angle) * this.orbitRadius;
+                });
+            }
+            draw(ctx) {
+                ctx.fillStyle = '#9ca3af'; 
+                this.scythes.forEach(scythe => {
+                    ctx.save();
+                    ctx.translate(scythe.x, scythe.y);
+                    ctx.rotate(scythe.angle + Math.PI / 2); 
+                    ctx.beginPath();
+                    ctx.moveTo(-this.scytheSize / 2, this.scytheSize / 3);
+                    ctx.lineTo(this.scytheSize / 2, this.scytheSize / 3);
+                    ctx.lineTo(0, -this.scytheSize * 2/3);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                });
+            }
+            upgrade() {
+                this.level++;
+                if (this.level % 2 === 0 && this.numScythes < 4) { 
+                    this.numScythes++;
+                }
+                this.damage += 12; 
+                this.orbitRadius += (this.numScythes > 1 ? 3 : 5); 
+                this.rotationSpeed += 0.002;
+                this.createScythes();
+            }
+            getUpgradeDescription() {
+                let desc = `Увеличить урон кос (+12). `;
+                if (this.level % 2 !== 0 && this.numScythes < 4) desc += `Следующее улучшение добавит косу. `;
+                else if (this.numScythes < 4) desc += `Добавить косу (+1). `;
+                desc += `Текущий: ${this.numScythes} кос, ${this.damage} урон.`;
+                return desc;
+            }
+        }
+        
+        class StaffWeapon {
+            constructor(player) {
+                this.player = player;
+                this.type = WEAPONS.STAFF;
+                this.level = 1;
+                this.projectiles = [];
+                this.damage = 15;
+                this.cooldown = 1.5 * 60; 
+                this.cooldownTimer = 0;
+                this.numProjectiles = 1;
+                this.projectileSpeed = 5;
+                this.projectileSize = 8;
+                this.projectileColor = '#60a5fa'; 
+            }
+
+            findNearestEnemies(count) {
+                if (enemies.length === 0) return [];
+                const liveEnemies = enemies.filter(e => e.health > 0);
+                if (liveEnemies.length === 0) return [];
+
+                return liveEnemies
+                    .map(enemy => ({
+                        enemy,
+                        dist: Math.hypot(this.player.x - enemy.x, this.player.y - enemy.y)
+                    }))
+                    .sort((a, b) => a.dist - b.dist)
+                    .slice(0, count)
+                    .map(item => item.enemy);
+            }
+
+            update() {
+                for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                    this.projectiles[i].update();
+                    if (!this.projectiles[i].active) {
+                        this.projectiles.splice(i, 1);
+                    }
+                }
+
+                if (this.cooldownTimer > 0) {
+                    this.cooldownTimer--;
+                    return;
+                }
+
+                const targets = this.findNearestEnemies(this.numProjectiles);
+                if (targets.length > 0) {
+                    targets.forEach(target => {
+                        this.projectiles.push(new Projectile(
+                            this.player.x, this.player.y,
+                            target,
+                            this.projectileSpeed, this.damage,
+                            this.projectileSize, this.projectileColor
+                        ));
+                    });
+                    this.cooldownTimer = this.cooldown;
+                }
+            }
+
+            draw(ctx) {
+                this.projectiles.forEach(p => p.draw(ctx));
+            }
+
+            upgrade() {
+                this.level++;
+                this.damage += 5; 
+                if (this.cooldown > 0.5 * 60) { 
+                    this.cooldown -= 0.15 * 60; 
+                }
+                if (this.level % 2 === 0 && this.numProjectiles < 5) { 
+                    this.numProjectiles++;
+                }
+                this.projectileSpeed += 0.2;
+            }
+
+            getUpgradeDescription() {
+                let desc = `Урон +5 (тек: ${this.damage}). Перезарядка -0.15с (тек: ${(this.cooldown / 60).toFixed(2)}с). `;
+                if (this.level % 2 !== 0 && this.numProjectiles < 5) desc += `След. улучш. добавит снаряд. `;
+                else if (this.numProjectiles < 5) desc += `Добавить снаряд (+1). `;
+                desc += `Тек: ${this.numProjectiles} снаряд(ов).`;
+                return desc;
+            }
+        }
+
+        class FireRainWeapon {
+            constructor(player) {
+                this.player = player;
+                this.type = WEAPONS.FIRERAIN;
+                this.level = 1;
+                this.activePatches = []; 
+                
+                this.cooldown = 6 * 60; 
+                this.cooldownTimer = 0; 
+                this.areaWidth = 100;
+                this.areaHeight = 100;
+                this.patchDuration = 3 * 60; 
+                this.damagePerTick = 3;  
+                this.tickInterval = 0.3 * 60; 
+            }
+
+            update() {
+                for (let i = this.activePatches.length - 1; i >= 0; i--) {
+                    const patch = this.activePatches[i];
+                    patch.remainingDuration--;
+                    patch.tickTimer--;
+
+                    if (patch.tickTimer <= 0) {
+                        patch.damageThisTick = true; 
+                        enemies.forEach(enemy => {
+                            if (enemy.x + enemy.size/2 > patch.x && enemy.x - enemy.size/2 < patch.x + patch.width &&
+                                enemy.y + enemy.size/2 > patch.y && enemy.y - enemy.size/2 < patch.y + patch.height) {
+                                if (enemy.takeDamage(this.damagePerTick)) {
+                                    const enemyIndex = enemies.indexOf(enemy);
+                                    if (enemyIndex > -1) {
+                                        enemies.splice(enemyIndex, 1);
+                                        score += 10; 
+                                    }
+                                }
+                            }
+                        });
+                        patch.tickTimer = this.tickInterval;
+                    } else {
+                        patch.damageThisTick = false;
+                    }
+
+                    if (patch.remainingDuration <= 0) {
+                        this.activePatches.splice(i, 1);
+                    }
+                }
+
+                if (this.cooldownTimer > 0) {
+                    this.cooldownTimer--;
+                    return;
+                }
+
+                const patchX = Math.random() * (canvas.width - this.areaWidth);
+                const patchY = Math.random() * (canvas.height - this.areaHeight);
+                this.activePatches.push({
+                    x: patchX,
+                    y: patchY,
+                    width: this.areaWidth,
+                    height: this.areaHeight,
+                    remainingDuration: this.patchDuration,
+                    tickTimer: this.tickInterval, 
+                    damageThisTick: false
+                });
+                this.cooldownTimer = this.cooldown;
+            }
+
+            draw(ctx) {
+                this.activePatches.forEach(patch => {
+                    const alpha = 0.2 + Math.random() * 0.3; 
+                    ctx.fillStyle = `rgba(255, ${Math.floor(Math.random() * 100 + 100)}, 0, ${alpha})`; 
+                    ctx.fillRect(patch.x, patch.y, patch.width, patch.height);
+                    
+                    for(let k=0; k < 3; k++) { 
+                        ctx.beginPath();
+                        const particleX = patch.x + Math.random() * patch.width;
+                        const particleY = patch.y + Math.random() * patch.height;
+                        const particleSize = Math.random() * 4 + 2;
+                        ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(255, ${Math.floor(Math.random() * 50 + 150)}, 0, ${0.5 + Math.random() * 0.3})`;
+                        ctx.fill();
+                    }
+                });
+            }
+
+            upgrade() {
+                this.level++;
+                this.damagePerTick += 1;
+                if (this.cooldown > 2 * 60) { 
+                    this.cooldown -= 0.5 * 60; 
+                }
+                this.areaWidth += 15;
+                this.areaHeight += 15;
+                if (this.patchDuration < 5 * 60) { 
+                    this.patchDuration += 0.5 * 60;
+                }
+                 if (this.tickInterval > 0.15 * 60) { 
+                    this.tickInterval -= 0.05 * 60;
+                }
+            }
+
+            getUpgradeDescription() {
+                return `Урон +1/тик (тек: ${this.damagePerTick}). Перезарядка -0.5с (тек: ${(this.cooldown/60).toFixed(1)}с). Площадь +15x15 (тек: ${this.areaWidth}x${this.areaHeight}). Длит. +0.5с.`;
+            }
+        }
+
+
+        class Enemy {
+            constructor(x, y, isArmored = false) {
+                this.isArmored = isArmored;
+                this.x = x;
+                this.y = y;
+                
+                const baseSpeed = Math.random() * (ENEMY_SPEED_MAX - ENEMY_SPEED_MIN) + ENEMY_SPEED_MIN + (elapsedTime / 150);
+
+                if (this.isArmored) {
+                    this.size = ENEMY_REGULAR_SIZE * ENEMY_ARMORED_SIZE_MULTIPLIER;
+                    this.health = currentEnemyHealth * ARMORED_ENEMY_HEALTH_MULTIPLIER;
+                    this.speed = baseSpeed * ARMORED_ENEMY_SPEED_MULTIPLIER;
+                    this.xpValue = ENEMY_XP_DROP * ARMORED_ENEMY_XP_MULTIPLIER;
+                    this.headColor = '#9e9e9e'; 
+                } else {
+                    this.size = ENEMY_REGULAR_SIZE;
+                    this.health = currentEnemyHealth;
+                    this.speed = baseSpeed;
+                    this.xpValue = ENEMY_XP_DROP;
+                    this.headColor = '#ffffff'; 
+                }
+                this.maxHealth = this.health;
+                this.hitByScytheThisFrame = false; 
+                this.tailLength = this.size * 2.0; 
+                this.tailSegments = 5; 
+                this.animationOffset = Math.random() * 100; 
+                this.maxTailWidth = Math.max(1.5, this.size / (this.isArmored ? 2.0 : 2.5)); 
+                this.minTailWidth = 0.5; 
+            }
+
+            draw() {
+                const healthBarWidth = this.size * 1.2; 
+                const healthBarHeight = 4;
+                const healthBarX = this.x - healthBarWidth / 2;
+                const healthBarY = this.y - this.size / 2 - healthBarHeight - 6; 
+                ctx.fillStyle = '#4b5563';
+                ctx.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+                const currentHealthWidth = (this.health / this.maxHealth) * healthBarWidth;
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(healthBarX, healthBarY, currentHealthWidth > 0 ? currentHealthWidth : 0, healthBarHeight);
+
+                ctx.strokeStyle = this.isArmored ? '#757575' : '#e0e0e0'; 
+                
+                let angleToPlayer = Math.atan2(player.y - this.y, player.x - this.x);
+                let tailDirectionAngle = angleToPlayer + Math.PI; 
+
+                let prevX = this.x;
+                let prevY = this.y;
+
+                for (let i = 0; i < this.tailSegments; i++) {
+                    const progress = (i + 1) / this.tailSegments; 
+                    ctx.lineWidth = this.maxTailWidth - (this.maxTailWidth - this.minTailWidth) * progress;
+                    
+                    const wiggleAngle = Math.sin((animationFrameCounter * 0.1 + this.animationOffset + i * 0.5)) * (this.isArmored ? 0.3 : 0.4); 
+                    const actualAngle = tailDirectionAngle + wiggleAngle;
+                    
+                    const segmentLength = this.tailLength / this.tailSegments;
+                    const currentX = prevX + Math.cos(actualAngle) * segmentLength;
+                    const currentY = prevY + Math.sin(actualAngle) * segmentLength;
+                    
+                    ctx.beginPath(); 
+                    ctx.moveTo(prevX, prevY);
+                    ctx.lineTo(currentX, currentY);
+                    ctx.stroke();
+
+                    prevX = currentX;
+                    prevY = currentY;
+                }
+                
+                ctx.lineWidth = 1;
+
+
+                ctx.fillStyle = this.headColor; 
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            update() {
+                if (!player) return; 
+                const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                this.vx = Math.cos(angle) * this.speed; 
+                this.vy = Math.sin(angle) * this.speed;
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            takeDamage(amount) {
+                this.health -= amount;
+                if (this.health <= 0) {
+                    xpOrbs.push(new XPOrb(this.x, this.y, this.xpValue)); 
+                    return true; 
+                }
+                return false;
+            }
+        }
+
+        function populateClassSelection() {
+            classChoiceContainer.innerHTML = ''; // Clear previous choices
+            PLAYER_CLASSES.forEach(playerClass => {
+                const button = document.createElement('button');
+                button.classList.add('class-choice-button');
+                
+                const titleDiv = document.createElement('div');
+                titleDiv.classList.add('choice-title');
+                titleDiv.textContent = playerClass.name;
+                
+                const descDiv = document.createElement('div');
+                descDiv.classList.add('choice-desc');
+                descDiv.textContent = playerClass.description;
+
+                button.appendChild(titleDiv);
+                button.appendChild(descDiv);
+
+                button.onclick = () => {
+                    startGame(playerClass.weapon);
+                };
+                classChoiceContainer.appendChild(button);
+            });
+        }
+
+
+        function startGame(startingWeapon) { // Renamed from initGame to avoid confusion
+            classSelectionScreen.style.display = 'none';
+            uiContainer.style.display = 'flex'; // Show game UI
+            xpBarContainer.style.display = 'block'; // Show XP bar
+
+            resizeCanvas(); 
+            gameActive = true;
+            gamePaused = false;
+            score = 0;
+            elapsedTime = 0;
+            animationFrameCounter = 0;
+            currentEnemySpawnInterval = ENEMY_SPAWN_INTERVAL_INITIAL;
+            currentEnemyHealth = ENEMY_HEALTH_INITIAL;
+
+            player = new Player(canvas.width / 2, canvas.height / 2, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HEALTH, startingWeapon);
+            enemies = [];
+            xpOrbs = [];
+            keys = {};
+
+            joystickActive = false; 
+            playerMoveDx = 0;
+            playerMoveDy = 0;
+
+            gameOverScreen.style.display = 'none';
+            if (gameOverImageElement) { 
+                 gameOverImageElement.style.display = 'none';
+                 gameOverImageElement.src = 'https://placehold.co/400x300/1f2937/f3f4f6?text=Загрузка...'; 
+            }
+            levelUpScreen.style.display = 'none';
+            
+            updateUI(); // Initial UI update for new game
+            
+            // Clear any old intervals just in case
+            if (gameInterval) clearInterval(gameInterval);
+            if (spawnInterval) clearInterval(spawnInterval);
+            if (timerInterval) clearInterval(timerInterval);
+
+            gameInterval = setInterval(gameLoop, 1000 / 60); 
+            spawnEnemy(); 
+            spawnInterval = setInterval(spawnEnemy, currentEnemySpawnInterval);
+            timerInterval = setInterval(() => {
+                if (gameActive && !gamePaused) {
+                    elapsedTime++; 
+                    if (elapsedTime % 10 === 0) { 
+                        currentEnemySpawnInterval = Math.max(300, currentEnemySpawnInterval * 0.92); 
+                        currentEnemyHealth = Math.floor(currentEnemyHealth * 1.10); 
+                        clearInterval(spawnInterval);
+                        spawnInterval = setInterval(spawnEnemy, currentEnemySpawnInterval);
+                    }
+                    updateUI();
+                }
+            }, 1000);
+        }
+        
+        function showInitialScreen() {
+            gameActive = false;
+            gamePaused = true;
+            if (gameInterval) clearInterval(gameInterval);
+            if (spawnInterval) clearInterval(spawnInterval);
+            if (timerInterval) clearInterval(timerInterval);
+            
+            enemies = []; 
+            xpOrbs = [];  
+            if (player && player.activeWeapons) { 
+                player.activeWeapons.forEach(weapon => {
+                    if (weapon.type === WEAPONS.FIRERAIN && weapon.activePatches) weapon.activePatches = [];
+                    if (weapon.type === WEAPONS.STAFF && weapon.projectiles) weapon.projectiles = [];
+                });
+            }
+            player = null; 
+
+            uiContainer.style.display = 'none'; // Hide game UI
+            xpBarContainer.style.display = 'none'; // Hide XP bar
+            classSelectionScreen.style.display = 'flex';
+            gameOverScreen.style.display = 'none'; 
+            levelUpScreen.style.display = 'none';  
+            populateClassSelection();
+        }
+
+
+        function drawJoystick() {
+            if (!joystickActive) return;
+            ctx.beginPath();
+            ctx.arc(joystickCenterX, joystickCenterY, JOYSTICK_BASE_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(128, 128, 128, 0.3)'; 
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(joystickKnobX, joystickKnobY, JOYSTICK_KNOB_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(80, 80, 80, 0.7)'; 
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(150, 150, 150, 0.8)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+
+        function gameLoop() {
+            if (!gameActive || gamePaused) return;
+            animationFrameCounter++; 
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            player.update(); 
+            player.draw();   
+
+            xpOrbs.forEach((orb, index) => {
+                orb.update();
+                orb.draw();
+                const distToPlayer = Math.hypot(player.x - orb.x, player.y - orb.y);
+                if (distToPlayer < player.size / 2 + orb.size / 2) {
+                    player.addXP(orb.value);
+                    xpOrbs.splice(index, 1);
+                }
+            });
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                if (!enemy) continue; 
+
+                enemy.update();
+                enemy.draw();
+                let enemyKilledThisFrame = false;
+
+                player.activeWeapons.forEach(weapon => {
+                    if (enemyKilledThisFrame) return;
+
+                    if (weapon.type === WEAPONS.AURA) {
+                        const distToAura = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+                        if (distToAura < weapon.radius + enemy.size / 2) { 
+                            if (enemy.takeDamage(weapon.getDamagePerFrame())) {
+                                enemies.splice(i, 1);
+                                score += 10; 
+                                enemyKilledThisFrame = true;
+                            }
+                        }
+                    } else if (weapon.type === WEAPONS.SCYTHE) {
+                        for (const scythe of weapon.scythes) {
+                            if (enemyKilledThisFrame) break;
+                            const distToScythe = Math.hypot(scythe.x - enemy.x, scythe.y - enemy.y);
+                            if (distToScythe < weapon.scytheSize / 2 + enemy.size / 2) {
+                                if (!enemy.hitByScytheThisFrame) {
+                                    if (enemy.takeDamage(weapon.damage)) {
+                                        enemies.splice(i, 1);
+                                        score += 10; 
+                                        enemyKilledThisFrame = true;
+                                    }
+                                    enemy.hitByScytheThisFrame = true;
+                                    setTimeout(() => { if(enemy) enemy.hitByScytheThisFrame = false; }, 300); 
+                                }
+                            }
+                        }
+                    }
+                });
+
+                 if (enemyKilledThisFrame) {
+                    updateUI();
+                    continue; 
+                }
+
+                const distToPlayerBody = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+                if (distToPlayerBody < player.size / 2 + enemy.size / 2) { 
+                    enemies.splice(i, 1); 
+                    player.takeDamage(15 + Math.floor(elapsedTime / 15)); 
+                    updateUI();
+                }
+            }
+            drawJoystick(); 
+        }
+
+        function spawnEnemy() {
+            if (!gameActive || gamePaused) return;
+            let x, y;
+            
+            let isArmored = false;
+            if (elapsedTime >= ARMORED_ENEMY_SPAWN_TIME_THRESHOLD && Math.random() < ARMORED_ENEMY_SPAWN_CHANCE) {
+                isArmored = true;
+            }
+            
+            const enemyHeadSize = isArmored ? ENEMY_REGULAR_SIZE * ENEMY_ARMORED_SIZE_MULTIPLIER : ENEMY_REGULAR_SIZE;
+            const spawnMargin = enemyHeadSize * 1.5; 
+
+            const edge = Math.floor(Math.random() * 4);
+            if (edge === 0) { x = Math.random() * canvas.width; y = -spawnMargin; } 
+            else if (edge === 1) { x = canvas.width + spawnMargin; y = Math.random() * canvas.height; }
+            else if (edge === 2) { x = Math.random() * canvas.width; y = canvas.height + spawnMargin; }
+            else { x = -spawnMargin; y = Math.random() * canvas.height; }
+            
+            enemies.push(new Enemy(x, y, isArmored)); 
+        }
+
+        function updateUI() {
+            if (!player) { // Handle case where player might be null (e.g. on class selection screen)
+                healthDisplay.textContent = `Здоровье: --`;
+                levelDisplay.textContent = `Уровень: --`;
+                xpBar.style.width = `0%`;
+                // scoreDisplay and timeDisplay can remain or be cleared
+                scoreDisplay.textContent = `Очки: 0`;
+                timeDisplay.textContent = `Время: 0с`;
+                return;
+            }
+            healthDisplay.textContent = `Здоровье: ${player.health}`;
+            levelDisplay.textContent = `Уровень: ${player.level}`;
+            timeDisplay.textContent = `Время: ${elapsedTime}с`;
+            scoreDisplay.textContent = `Очки: ${score}`;
+            const xpPercentage = Math.min(100, (player.currentXP / player.xpToNextLevel) * 100);
+            xpBar.style.width = `${xpPercentage}%`;
+        }
+
+        function gameOver() {
+            gameActive = false;
+            gamePaused = true; 
+            joystickActive = false; 
+            playerMoveDx = 0;
+            playerMoveDy = 0;
+
+            clearInterval(gameInterval); 
+            clearInterval(spawnInterval);
+            clearInterval(timerInterval);
+
+            if (gameOverTitleElement) { 
+                gameOverTitleElement.textContent = 'Вы залетели!'; 
+            }
+            if (gameOverImageElement) {
+                gameOverImageElement.src = USER_GAME_OVER_IMAGE_URL; 
+                gameOverImageElement.style.display = 'block'; 
+                gameOverImageElement.onerror = () => {
+                    gameOverImageElement.src = 'https://placehold.co/400x300/1f2937/f3f4f6?text=Ошибка+загрузки';
+                    gameOverImageElement.alt = 'Ошибка загрузки изображения';
+                };
+            }
+            finalTimeText.textContent = `Вы продержались: ${elapsedTime}с`;
+            finalScoreText.textContent = `Финальный счет: ${score}`;
+            gameOverScreen.style.display = 'flex';
+            uiContainer.style.display = 'none'; // Hide game UI on game over
+            xpBarContainer.style.display = 'none'; // Hide XP bar
+        }
+        
+        function pauseGameAndShowLevelUpChoices() {
+            gamePaused = true;
+            joystickActive = false; 
+            playerMoveDx = 0;
+            playerMoveDy = 0;
+
+            weaponChoiceContainer.innerHTML = ''; 
+
+            const availableChoices = [];
+            
+            const auraWeapon = player.activeWeapons.find(w => w.type === WEAPONS.AURA);
+            if (auraWeapon) { 
+                 availableChoices.push({
+                    name: `Улучшить Ауру (Ур. ${auraWeapon.level + 1})`,
+                    description: auraWeapon.getUpgradeDescription(),
+                    action: () => player.addWeapon(WEAPONS.AURA, true),
+                    sortPriority: 1 
+                });
+            }
+
+            const scytheWeapon = player.activeWeapons.find(w => w.type === WEAPONS.SCYTHE);
+            if (scytheWeapon) {
+                 availableChoices.push({
+                    name: `Улучшить Косы (Ур. ${scytheWeapon.level + 1})`,
+                    description: scytheWeapon.getUpgradeDescription(),
+                    action: () => player.addWeapon(WEAPONS.SCYTHE, true),
+                    sortPriority: 2
+                });
+            } else if (player.level >= 2) { 
+                 availableChoices.push({
+                    name: `Новое: Вращающиеся Косы`,
+                    description: "Косы вращаются вокруг вас, нанося урон.",
+                    action: () => player.addWeapon(WEAPONS.SCYTHE),
+                    sortPriority: 2
+                });
+            }
+
+            const staffWeapon = player.activeWeapons.find(w => w.type === WEAPONS.STAFF);
+            if (staffWeapon) {
+                 availableChoices.push({
+                    name: `Улучшить Посох (Ур. ${staffWeapon.level + 1})`,
+                    description: staffWeapon.getUpgradeDescription(),
+                    action: () => player.addWeapon(WEAPONS.STAFF, true),
+                    sortPriority: 3
+                });
+            } else if (player.level >= 3) { 
+                 availableChoices.push({
+                    name: `Новое: Магический Посох`,
+                    description: "Стреляет магическими снарядами в ближайших врагов.",
+                    action: () => player.addWeapon(WEAPONS.STAFF),
+                    sortPriority: 3
+                });
+            }
+
+            const fireRainWeapon = player.activeWeapons.find(w => w.type === WEAPONS.FIRERAIN);
+            if (fireRainWeapon) {
+                availableChoices.push({
+                    name: `Улучшить Огненный Дождь (Ур. ${fireRainWeapon.level + 1})`,
+                    description: fireRainWeapon.getUpgradeDescription(),
+                    action: () => player.addWeapon(WEAPONS.FIRERAIN, true),
+                    sortPriority: 4
+                });
+            } else if (player.level >= 4 ) { 
+                availableChoices.push({
+                    name: `Новое: Огненный Дождь`,
+                    description: "Вызывает огненный дождь, наносящий урон по области.",
+                    action: () => player.addWeapon(WEAPONS.FIRERAIN),
+                    sortPriority: 4
+                });
+            }
+            
+            if (player.level % 3 === 0 || availableChoices.length < 2) { 
+                availableChoices.push({
+                    name: "Улучшить Здоровье (+20%)",
+                    description: `Увеличить максимальное здоровье на 20%. Текущее: ${player.maxHealth}`,
+                    action: () => {
+                        player.maxHealth = Math.floor(player.maxHealth * 1.20);
+                        player.health = Math.min(player.maxHealth, player.health + Math.floor(player.maxHealth * 0.20)); 
+                        updateUI();
+                    },
+                    sortPriority: 5 
+                });
+            }
+
+            availableChoices.sort((a, b) => a.sortPriority - b.sortPriority || Math.random() - 0.5); 
+            const choicesToShow = availableChoices.slice(0, Math.min(availableChoices.length, 3)); 
+
+
+            choicesToShow.forEach(choice => {
+                const button = document.createElement('button');
+                button.classList.add('class-choice-button'); // Re-using class for similar style
+                
+                const titleDiv = document.createElement('div');
+                titleDiv.classList.add('choice-title');
+                titleDiv.textContent = choice.name;
+                
+                const descDiv = document.createElement('div');
+                descDiv.classList.add('choice-desc');
+                descDiv.textContent = choice.description;
+
+                button.appendChild(titleDiv);
+                button.appendChild(descDiv);
+
+                button.onclick = () => {
+                    choice.action();
+                    levelUpScreen.style.display = 'none';
+                    gamePaused = false; 
+                    updateUI(); 
+                };
+                weaponChoiceContainer.appendChild(button);
+            });
+
+            levelUpScreen.style.display = 'flex';
+        }
+
+        // --- Touch Event Handlers ---
+        function getTouchPos(canvasDom, touchEvent) {
+            const rect = canvasDom.getBoundingClientRect();
+            const touch = touchEvent.touches[0] || touchEvent.changedTouches[0];
+            return {
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top
+            };
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (gamePaused || !gameActive || !player) return; // Only activate joystick if game is running
+            e.preventDefault(); 
+            
+            const pos = getTouchPos(canvas, e);
+            joystickActive = true;
+            joystickCenterX = pos.x;
+            joystickCenterY = pos.y;
+            joystickKnobX = pos.x; 
+            joystickKnobY = pos.y;
+            playerMoveDx = 0;
+            playerMoveDy = 0;
+            
+        }, { passive: false }); 
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!joystickActive || gamePaused || !gameActive) return;
+            e.preventDefault();
+            const pos = getTouchPos(canvas, e);
+            
+            const deltaX = pos.x - joystickCenterX;
+            const deltaY = pos.y - joystickCenterY;
+            const distance = Math.hypot(deltaX, deltaY);
+
+            if (distance > JOYSTICK_BASE_RADIUS) {
+                joystickKnobX = joystickCenterX + (deltaX / distance) * JOYSTICK_BASE_RADIUS;
+                joystickKnobY = joystickCenterY + (deltaY / distance) * JOYSTICK_BASE_RADIUS;
+            } else {
+                joystickKnobX = pos.x;
+                joystickKnobY = pos.y;
+            }
+
+            if (distance > JOYSTICK_DEAD_ZONE) {
+                playerMoveDx = deltaX / JOYSTICK_BASE_RADIUS; 
+                playerMoveDy = deltaY / JOYSTICK_BASE_RADIUS; 
+                playerMoveDx = Math.max(-1, Math.min(1, playerMoveDx));
+                playerMoveDy = Math.max(-1, Math.min(1, playerMoveDy));
+
+            } else {
+                playerMoveDx = 0;
+                playerMoveDy = 0;
+            }
+
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (!joystickActive) return;
+            joystickActive = false;
+            playerMoveDx = 0;
+            playerMoveDy = 0;
+        }, { passive: false });
+
+        canvas.addEventListener('touchcancel', (e) => { 
+            if (!joystickActive) return;
+            joystickActive = false;
+            playerMoveDx = 0;
+            playerMoveDy = 0;
+        }, { passive: false });
+
+
+        // --- Keyboard Event Handlers ---
+        window.addEventListener('keydown', (e) => {
+            if (joystickActive) return; 
+            keys[e.key.toLowerCase()] = true; 
+             if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "w", "a", "s", "d"].includes(e.key.toLowerCase())) {
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        restartButton.addEventListener('click', showInitialScreen); // Restart goes to class selection
+        window.addEventListener('resize', resizeCanvas); 
+        
+        // Initial call
+        window.onload = () => {
+            resizeCanvas(); 
+            showInitialScreen(); // Start by showing class selection
+        };
+    </script>
+</body>
+</html>
